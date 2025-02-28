@@ -27,7 +27,7 @@ class CellButton(tk.Button):
             master,
             command=lambda: command(row, col),
             width=8,
-            height=4,
+            height=5,
             **kwargs
         )
 

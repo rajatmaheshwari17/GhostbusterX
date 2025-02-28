@@ -36,7 +36,14 @@ class GameWindow:
 
     def setup_ui(self):
         # Frame for the game grid
-        self.grid_frame = tk.Frame(self.master)
+        # self.grid_frame = tk.Frame(self.master)
+        self.grid_frame = tk.Frame(
+            self.master,
+            # bd=3,             # borderwidth
+            # relief=tk.SOLID   # or tk.GROOVE, tk.RAISED, tk.RIDGE, etc.
+            highlightthickness=10,
+            highlightbackground= "#5D4037"#"#B89F7B"
+        )
         self.grid_frame.pack(padx=10, pady=10)
 
         for i in range(self.GRID_SIZE):
@@ -58,14 +65,22 @@ class GameWindow:
         self.burst_button = tk.Button(
             self.control_frame,
             text="Burst Mode",
-            command=self.activate_burst_mode
+            command=self.activate_burst_mode,
+            width=15,           # Increase width
+            height=2,           # Increase height
+            bg="red",           # Background color
+            # fg="white",         # Text color
+            font=("Helvetica", 14, "bold")  # Example font
         )
         self.burst_button.grid(row=0, column=0, padx=5)
 
         self.restart_button = tk.Button(
             self.control_frame,
             text="Restart Game",
-            command=self.restart_game
+            command=self.restart_game,
+            width=15,           # Increase width
+            height=2,
+            font=("Helvetica", 14, "bold")
         )
         self.restart_button.grid(row=0, column=1, padx=5)
 
@@ -97,7 +112,7 @@ class GameWindow:
             if ghost_moved:
                 messagebox.showinfo("Info", "The ghost sensed you and moved!")
             self.status_label.config(text="Inquiry Mode | Ghost moves left: " + str(self.game.ghost.moves_left))
-
+    '''
     def activate_burst_mode(self):
         """
         Activates burst mode so the next cell click is a one-chance ghost catch.
@@ -107,6 +122,22 @@ class GameWindow:
             self.status_label.config(text="Burst Mode Activated: Click on the ghost's location!")
         else:
             messagebox.showinfo("Info", "Burst Mode is already activated!")
+    '''
+
+    def activate_burst_mode(self):
+        """
+        Toggles burst mode on/off.
+        """
+        if self.game.burst_mode:
+            # Burst mode is currently on, so turn it off
+            self.game.burst_mode = False
+            self.status_label.config(
+                text="Inquiry Mode | Ghost moves left: " + str(self.game.ghost.moves_left)
+            )
+        else:
+            # Turn burst mode on
+            self.game.switch_to_burst_mode()
+            self.status_label.config(text="Burst Mode Activated: Click on the ghost's location!")
 
     def disable_grid(self):
         """Disables all cell buttons after a burst mode attempt."""
