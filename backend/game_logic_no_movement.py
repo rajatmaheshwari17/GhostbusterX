@@ -1,13 +1,13 @@
 """
 game_logic.py
 
-Demonstration of a region-based probability update:
+Demonstration of a region-based probability update with a 5×5 region:
   1. Initially, all cells have equal probability (1 / (GRID_SIZE * GRID_SIZE)).
-  2. After each inquiry, the region around the ghost (ghost cell + 8 neighbors)
-     is multiplied by a "boost" factor, and cells outside that region are
-     multiplied by a "decrease" factor.
-  3. Once the player inquires the correct region, probabilities for that region
-     become significantly higher, and others become lower.
+  2. After each inquiry, the region around the ghost (ghost cell + the 24 surrounding cells)
+     is multiplied by a "boost" factor, and cells outside that region are multiplied by
+     a "decrease" factor.
+  3. Once the player inquires the correct region, probabilities for that region become
+     significantly higher, and others become lower.
 
 This is a heuristic approach to "guide" the player, not a strict Bayesian update.
 """
@@ -47,6 +47,9 @@ class Grid:
                 yield cell
 
     def get_nearby_cells(self, row, col, distance=1):
+        """
+        Returns all cells within 'distance' in row & col, excluding the cell itself.
+        """
         results = []
         for r in range(row - distance, row + distance + 1):
             for c in range(col - distance, col + distance + 1):
@@ -61,7 +64,8 @@ class Ghost:
     def __init__(self, grid_size=GRID_SIZE, moves_left=3):
         self.x = random.randint(0, grid_size - 1)
         self.y = random.randint(0, grid_size - 1)
-        self.moves_left = moves_left
+        # If you don't want the ghost to move at all, set moves_left=0
+        self.moves_left = 0  # or 'moves_left' if you want to allow movement
 
     def position(self):
         return (self.x, self.y)
@@ -72,7 +76,6 @@ class Ghost:
     def move(self, grid):
         """
         Attempt to move the ghost to a new location, avoiding inquired cells.
-        (Optionally also avoid cells with inquired neighbors if you like.)
         If no valid position is found, the ghost stays put.
         """
         if self.moves_left <= 0:
@@ -104,8 +107,6 @@ class Game:
         self.burst_mode = False
         # Initially, all cells are equally possible
         self.possible_positions = {(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE)}
-        # No immediate region-based update needed, but we can do one if desired
-        # self.apply_region_based_probabilities()
 
     def is_ghost_nearby(self, row, col):
         gx, gy = self.ghost.position()
@@ -129,11 +130,11 @@ class Game:
             cell.color = "green"
             print("[Game] Ghost is far.")
 
-        # After we know the color, apply constraints or any other logic
+        # Apply constraints based on color
         self.apply_constraints(row, col, cell.color)
         # Then apply region-based probability updates
         self.apply_region_based_probabilities(cell.color)
-        # Attempt ghost move
+        # Attempt ghost move (if moves_left > 0)
         ghost_moved = self.attempt_ghost_move(row, col)
 
         return ghost_moved
@@ -147,7 +148,6 @@ class Game:
         """
         if color == "red":
             self.possible_positions = {(row, col)}
-            # Probability for that cell will be forced to 1.0 in apply_region_based_probabilities()
             return
 
         neighbors = self.grid.get_nearby_cells(row, col, distance=1)
@@ -164,7 +164,7 @@ class Game:
         """
         A "heuristic" approach:
           1. If color is "red", that means the ghost is exactly here => set that cell to 1, all else 0.
-          2. Otherwise, find the ghost's 3x3 region. Multiply region probabilities by a "boost" factor,
+          2. Otherwise, find the ghost's 5x5 region. Multiply region probabilities by a "boost" factor,
              and multiply everything else by a "decrease" factor, then normalize.
         """
         # If the ghost was found exactly, set that cell to 1.0
@@ -176,17 +176,17 @@ class Game:
             self.grid.get_cell(r, c).probability = 1.0
             return
 
-        # Identify the "ghost region" (3x3 block)
+        # Identify the "ghost region" as a 5×5 block around the ghost
         gx, gy = self.ghost.position()
         ghost_region = []
-        for rr in range(gx - 1, gx + 2):
-            for cc in range(gy - 1, gy + 2):
+        # Expand from (gx - 2) to (gx + 2) => 5×5 region total
+        for rr in range(gx - 2, gx + 3):
+            for cc in range(gy - 2, gy + 3):
                 cell = self.grid.get_cell(rr, cc)
                 if cell:
                     ghost_region.append(cell)
 
         # Choose multipliers
-        # Increase for region cells, decrease for others
         region_boost = 1.5
         outside_decrease = 0.8
 
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     print("\n[Test] Inquiring cell (5,5)...")
     game.inquire_cell(5, 5)
 
-    print("[Test] Updated probabilities after region-based logic:")
+    print("[Test] Updated probabilities after 5×5 region-based logic:")
     for r in range(GRID_SIZE):
         row_str = []
         for c in range(GRID_SIZE):
