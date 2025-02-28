@@ -1,64 +1,69 @@
 """
 game_logic.py
 
-This module contains the backend game logic for the ghostbuster game.
-It includes:
-  - A 10x10 grid with Cell objects holding inquiry status, color, and probability.
-  - A Ghost class that tracks the ghost's location and remaining moves.
-  - A Game class that orchestrates inquiries, ghost movements, and probability updates.
+An all-in-one implementation of the Ghostbuster game logic in Python using:
+  - A set-based approach to manage probabilities.
+  - A 10x10 grid of cells.
+  - A Ghost that can move up to 3 times if certain conditions are met.
+  - Colors: "red", "orange", "green" for each inquiry.
 
-The ghost moves up to 3 times. It moves if either:
-  - The player inquires the ghost’s exact cell.
-  - More than 80% of the cells in the neighborhood (adjacent cells) have been inquired.
-  
-Cell colors are updated as follows:
-  - "red" if the ghost is exactly at that cell.
-  - "orange" if the ghost is in a nearby cell.
-  - "green" if the ghost is far.
+Usage in a larger project:
+  from game_logic import Game
 
-In burst mode (switched separately), the player gets one chance to catch the ghost.
+  game = Game()
+  game.inquire_cell(3, 3)  # example
+  ...
 """
 
 import random
 
-# Global settings
+# Grid settings
 GRID_SIZE = 10
-NEARBY_DISTANCE = 1       # Cells adjacent (including diagonals) are considered nearby.
-MOVE_NEARBY_THRESHOLD = 0.8  # Ghost moves if >80% of nearby cells are inquired.
+NEARBY_DISTANCE = 1  # "Nearby" means within 1 cell (including diagonals)
+MOVE_NEARBY_THRESHOLD = 0.8  # Ghost moves if >80% of a cell's neighbors are inquired
 
 class Cell:
+    """
+    Represents a single cell in the 10x10 grid.
+    """
     def __init__(self, row, col):
         self.row = row
         self.col = col
         self.inquired = False
-        self.color = "neutral"
-        self.probability = 1 / (GRID_SIZE * GRID_SIZE)  # Uniform initial probability
+        self.color = "neutral"   # "red", "orange", "green", or "neutral"
+        # Start with uniform probability (0.01 each in a 10x10)
+        self.probability = 1.0 / (GRID_SIZE * GRID_SIZE)
 
     def __repr__(self):
-        return (f"Cell({self.row},{self.col}, inquired={self.inquired}, "
+        return (f"Cell(r={self.row}, c={self.col}, inq={self.inquired}, "
                 f"color={self.color}, prob={self.probability:.2f})")
 
 class Grid:
+    """
+    Manages a 2D array of Cell objects.
+    """
     def __init__(self, size=GRID_SIZE):
         self.size = size
-        self.cells = [[Cell(i, j) for j in range(size)] for i in range(size)]
+        self.cells = [[Cell(r, c) for c in range(size)] for r in range(size)]
 
     def get_cell(self, row, col):
         if 0 <= row < self.size and 0 <= col < self.size:
             return self.cells[row][col]
-        else:
-            return None
+        return None
 
     def get_nearby_cells(self, row, col, distance=NEARBY_DISTANCE):
-        nearby = []
-        for i in range(row - distance, row + distance + 1):
-            for j in range(col - distance, col + distance + 1):
-                if i == row and j == col:
+        """
+        Returns all cells within 'distance' in row & col, excluding the cell itself.
+        """
+        results = []
+        for r in range(row - distance, row + distance + 1):
+            for c in range(col - distance, col + distance + 1):
+                if (r, c) == (row, col):
                     continue
-                cell = self.get_cell(i, j)
+                cell = self.get_cell(r, c)
                 if cell:
-                    nearby.append(cell)
-        return nearby
+                    results.append(cell)
+        return results
 
     def all_cells(self):
         for row in self.cells:
@@ -66,206 +71,267 @@ class Grid:
                 yield cell
 
 class Ghost:
-    def __init__(self, grid_size=GRID_SIZE):
+    """
+    Tracks the ghost's location and movement allowances.
+    """
+    def __init__(self, grid_size=GRID_SIZE, moves_left=3):
         self.x = random.randint(0, grid_size - 1)
         self.y = random.randint(0, grid_size - 1)
-        self.moves_left = 3
+        self.moves_left = moves_left
 
     def position(self):
         return (self.x, self.y)
 
+    def can_move(self):
+        return self.moves_left > 0
+
     def move(self, grid):
         """
-        Moves the ghost to a new cell.
-        The ghost avoids cells that have been inquired AND have any
-        adjacent inquired cells (simulating that it won't move directly
-        where the player is nearby). If no valid cell is found, it chooses
-        any random cell except its current position.
+        Attempts to move the ghost to a new location, avoiding inquired cells
+        and their neighbors if possible. If no ideal cell is found, it picks
+        any random cell other than its current one.
         """
+        if self.moves_left <= 0:
+            return
+
         possible_positions = []
-        for i in range(grid.size):
-            for j in range(grid.size):
-                if (i, j) == (self.x, self.y):
+        for r in range(grid.size):
+            for c in range(grid.size):
+                if (r, c) == (self.x, self.y):
                     continue
-                cell = grid.get_cell(i, j)
-                # Avoid cells that are inquired
+                cell = grid.get_cell(r, c)
+                # Avoid inquired cells
                 if cell.inquired:
                     continue
-                # Check the cell’s neighbors; if any neighbor is inquired, skip it.
-                nearby = grid.get_nearby_cells(i, j)
-                if any(neighbor.inquired for neighbor in nearby):
+                # Avoid cells whose neighbors are inquired
+                neighbors = grid.get_nearby_cells(r, c, distance=1)
+                if any(n.inquired for n in neighbors):
                     continue
-                possible_positions.append((i, j))
+                possible_positions.append((r, c))
 
         if not possible_positions:
-            # Fallback: choose any cell other than current position.
-            for i in range(grid.size):
-                for j in range(grid.size):
-                    if (i, j) != (self.x, self.y):
-                        possible_positions.append((i, j))
+            # Fallback: any cell except current
+            for r in range(grid.size):
+                for c in range(grid.size):
+                    if (r, c) != (self.x, self.y):
+                        possible_positions.append((r, c))
+
         new_pos = random.choice(possible_positions)
         self.x, self.y = new_pos
         self.moves_left -= 1
-        print(f"Ghost moved to {new_pos}. Moves left: {self.moves_left}")
-        return new_pos
+        print(f"[Ghost] Moved to {new_pos}, moves left = {self.moves_left}")
 
 class Game:
+    """
+    Orchestrates the Ghostbuster game:
+      - Tracks a grid of cells
+      - Tracks the ghost's location and moves
+      - Maintains a set of possible positions for the ghost
+      - Updates probabilities based on inquiry feedback (red/orange/green)
+      - Allows a burst mode attempt
+    """
     def __init__(self):
         self.grid = Grid(GRID_SIZE)
         self.ghost = Ghost(GRID_SIZE)
         self.burst_mode = False
-        self.initialize_probabilities()
 
-    def initialize_probabilities(self):
-        """
-        Sets all cells to have an equal probability.
-        """
-        total_cells = self.grid.size * self.grid.size
-        for cell in self.grid.all_cells():
-            cell.probability = 1 / total_cells
-
-    def update_probabilities(self):
-        """
-        Updates the probability distribution:
-          - If the ghost has been exactly found (cell is inquired and is red), that cell gets probability 1.
-          - Otherwise, assign uniform probability among all non-inquired cells.
-        """
-        ghost_x, ghost_y = self.ghost.position()
-        ghost_cell = self.grid.get_cell(ghost_x, ghost_y)
-        if ghost_cell.inquired and ghost_cell.color == "red":
-            for cell in self.grid.all_cells():
-                cell.probability = 1.0 if cell == ghost_cell else 0.0
-            return
-
-        non_inquired = [cell for cell in self.grid.all_cells() if not cell.inquired]
-        count = len(non_inquired)
-        if count == 0:
-            return
-        uniform_prob = 1 / count
-        for cell in self.grid.all_cells():
-            cell.probability = 0.0 if cell.inquired else uniform_prob
+        # Initially, all cells are equally possible
+        self.possible_positions = {(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE)}
+        # Make sure probabilities are uniform
+        self.update_probabilities()
 
     def is_ghost_nearby(self, row, col):
         """
-        Returns True if the ghost is within the defined nearby range.
+        Returns True if the ghost is within NEARBY_DISTANCE of (row, col).
         """
-        ghost_x, ghost_y = self.ghost.position()
-        return abs(ghost_x - row) <= NEARBY_DISTANCE and abs(ghost_y - col) <= NEARBY_DISTANCE
-
-    def attempt_ghost_move(self, row, col):
-        """
-        Checks if the ghost should move based on the current inquiry.
-        Conditions for movement:
-          - The ghost still has moves left.
-          - The player has inquired more than 80% of the cells in the vicinity of the clicked cell,
-            OR the player clicked exactly where the ghost is.
-        If conditions are met, the ghost moves and probabilities are reinitialized.
-        Returns True if the ghost moved.
-        """
-        if self.ghost.moves_left <= 0:
-            return False
-
-        nearby_cells = self.grid.get_nearby_cells(row, col)
-        if not nearby_cells:
-            return False
-
-        inquired_count = sum(1 for cell in nearby_cells if cell.inquired)
-        if (inquired_count / len(nearby_cells) >= MOVE_NEARBY_THRESHOLD) or ((row, col) == self.ghost.position()):
-            self.ghost.move(self.grid)
-            self.initialize_probabilities()
-            return True
-        return False
+        gx, gy = self.ghost.position()
+        return abs(gx - row) <= NEARBY_DISTANCE and abs(gy - col) <= NEARBY_DISTANCE
 
     def inquire_cell(self, row, col):
         """
-        Processes the player's inquiry on cell (row, col).
-          - Marks the cell as inquired.
-          - Updates the cell's color:
-              * "red" if the ghost is exactly there.
-              * "orange" if the ghost is nearby.
-              * "green" if the ghost is far.
-          - Checks if ghost should move.
-          - Updates probability distribution.
-        Returns True if the ghost moved as a result of this inquiry.
+        The player inquires (clicks) a cell:
+          - If the ghost is there => color = red
+          - If the ghost is near => color = orange
+          - Else => color = green
+        Then apply constraints, recalc probabilities, and possibly move the ghost.
+        Returns True if the ghost moved, otherwise False.
         """
         cell = self.grid.get_cell(row, col)
-        if cell is None:
-            print("Invalid cell coordinates.")
-            return False
-
-        if cell.inquired:
-            print("Cell already inquired.")
+        if not cell or cell.inquired:
             return False
 
         cell.inquired = True
+        ghost_x, ghost_y = self.ghost.position()
 
-        if (row, col) == self.ghost.position():
+        # Determine color
+        if (row, col) == (ghost_x, ghost_y):
             cell.color = "red"
-            print("Ghost found at this cell!")
+            print("[Game] Ghost found here!")
         elif self.is_ghost_nearby(row, col):
             cell.color = "orange"
-            print("Ghost is nearby!")
+            print("[Game] Ghost is nearby!")
         else:
             cell.color = "green"
-            print("Ghost is far away.")
+            print("[Game] Ghost is far.")
 
-        ghost_moved = self.attempt_ghost_move(row, col)
+        # Apply constraints to possible positions
+        self.apply_constraints(row, col, cell.color)
+        # Recalculate probabilities
         self.update_probabilities()
+
+        # Attempt ghost move if conditions are met
+        ghost_moved = self.attempt_ghost_move(row, col)
         return ghost_moved
+
+    def apply_constraints(self, row, col, color):
+        """
+        Updates the set of possible positions based on the color feedback:
+          - red: ghost must be exactly here
+          - orange: ghost must be in the neighbors
+          - green: ghost cannot be in or near this cell
+        """
+        if color == "red":
+            # Only this cell remains possible
+            self.possible_positions = {(row, col)}
+            return
+
+        # Gather neighbors
+        neighbors = self.grid.get_nearby_cells(row, col, distance=1)
+        neighbor_coords = {(n.row, n.col) for n in neighbors}
+        clicked_coord = (row, col)
+
+        if color == "orange":
+            # Keep only the neighbors
+            self.possible_positions = self.possible_positions.intersection(neighbor_coords)
+        elif color == "green":
+            # Remove this cell and its neighbors
+            to_remove = neighbor_coords.union({clicked_coord})
+            self.possible_positions = self.possible_positions.difference(to_remove)
+
+    def update_probabilities(self):
+        """
+        Redistribute probabilities among the cells in self.possible_positions.
+        If there's exactly one cell left (red scenario), that cell = 1.0.
+        Otherwise, uniform distribution among all possible cells.
+        """
+        # First, set all to 0
+        for c in self.grid.all_cells():
+            c.probability = 0.0
+
+        count = len(self.possible_positions)
+        if count == 0:
+            # Edge case: No possible positions left (shouldn't happen if logic is consistent)
+            print("[Warning] No possible positions remain!")
+            return
+
+        prob_each = 1.0 / count
+        for (r, c) in self.possible_positions:
+            cell = self.grid.get_cell(r, c)
+            cell.probability = prob_each
+
+    def attempt_ghost_move(self, row, col):
+        """
+        Checks if the ghost should move. We reuse the rule:
+          - If the inquired cell is exactly the ghost location (red) OR
+          - If >80% of the cell's neighbors have been inquired
+        and the ghost still has moves left, it moves.
+
+        After moving, we reset possible_positions to all 100 cells
+        (or you can refine this if you want to keep old constraints).
+        """
+        if not self.ghost.can_move():
+            return False
+
+        cell = self.grid.get_cell(row, col)
+        neighbors = self.grid.get_nearby_cells(row, col, distance=1)
+        inquired_count = sum(n.inquired for n in neighbors)
+        threshold = int(MOVE_NEARBY_THRESHOLD * len(neighbors))
+
+        # Condition 1: exact location inquired => red
+        # (We allow the ghost to move if it still has moves left)
+        if cell.color == "red":
+            pass
+
+        # Condition 2: >80% neighbors inquired
+        if cell.color == "red" or (inquired_count >= threshold and len(neighbors) > 0):
+            old_pos = self.ghost.position()
+            self.ghost.move(self.grid)
+            new_pos = self.ghost.position()
+            if new_pos != old_pos:
+                # Reset possible positions or refine them (your choice).
+                # Here, we reset to all cells to keep it simple.
+                self.possible_positions = {(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE)}
+                self.update_probabilities()
+                return True
+
+        return False
 
     def burst_mode_attempt(self, row, col):
         """
-        In burst mode the player gets one chance.
-        Returns True if the ghost is caught, else False.
+        In burst mode, the player gets exactly one attempt to catch the ghost.
+        Return True if successful, else False.
         """
         if (row, col) == self.ghost.position():
-            print("Burst mode success! You caught the ghost!")
+            print("[Game] Burst mode success! Ghost caught!")
             return True
-        else:
-            print("Burst mode failed. You lost your chance.")
-            return False
+        print("[Game] Burst mode failed!")
+        return False
 
     def switch_to_burst_mode(self):
         """
-        Switches the game into burst mode.
+        Switches the game into burst mode. The next cell click is the final guess.
         """
         self.burst_mode = True
-        print("Switched to burst mode. One chance to catch the ghost!")
+        print("[Game] Burst mode activated! One chance to click the ghost's location.")
 
     def game_status(self):
         """
-        Returns a summary of the current game state.
-        If not in burst mode, ghost's location is hidden.
+        Returns a dictionary summarizing the current state for the UI.
+        If not in burst mode, we typically don't reveal the ghost position in a real game.
         """
         ghost_pos = self.ghost.position() if self.burst_mode else None
-        grid_state = [
-            [{"color": cell.color, "probability": round(cell.probability, 2), "inquired": cell.inquired}
-             for cell in row]
-            for row in self.grid.cells
-        ]
+        grid_info = []
+        for r in range(GRID_SIZE):
+            row_data = []
+            for c in range(GRID_SIZE):
+                cell = self.grid.get_cell(r, c)
+                # Round to 2 decimals so UI can display f"{prob:.2f}"
+                row_data.append({
+                    "inquired": cell.inquired,
+                    "color": cell.color,
+                    "probability": round(cell.probability, 2)
+                })
+            grid_info.append(row_data)
+
         return {
             "ghost_position": ghost_pos,
             "ghost_moves_left": self.ghost.moves_left,
             "burst_mode": self.burst_mode,
-            "grid": grid_state
+            "grid": grid_info
         }
 
-# Example usage and testing when running this module directly.
+# Quick test block if you run game_logic.py directly
 if __name__ == "__main__":
     game = Game()
-    print("Initial game state:")
-    print(game.game_status())
+    print("[Test] Initial probabilities:")
+    for r in range(GRID_SIZE):
+        row_str = []
+        for c in range(GRID_SIZE):
+            cell = game.grid.get_cell(r, c)
+            row_str.append(f"{cell.probability:.2f}")
+        print(" ".join(row_str))
 
-    # Simulate some inquiries
-    print("\nInquiring cell (0, 0):")
-    game.inquire_cell(0, 0)
-    print(game.game_status())
+    print("\n[Test] Inquiring cell (5,5)...")
+    game.inquire_cell(5, 5)
+    # Print updated probabilities
+    for r in range(GRID_SIZE):
+        row_str = []
+        for c in range(GRID_SIZE):
+            cell = game.grid.get_cell(r, c)
+            row_str.append(f"{cell.probability:.2f}")
+        print(" ".join(row_str))
 
-    print("\nInquiring cell (1, 1):")
-    game.inquire_cell(1, 1)
-    print(game.game_status())
-
-    # Switch to burst mode and attempt a burst click.
+    # Example of switching to burst mode
     game.switch_to_burst_mode()
-    ghost_caught = game.burst_mode_attempt(0, 0)
-    print("Burst mode attempt result:", ghost_caught)
+    success = game.burst_mode_attempt(5, 5)
+    print(f"[Test] Burst mode result: {success}")

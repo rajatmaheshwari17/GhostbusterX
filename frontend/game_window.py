@@ -18,18 +18,29 @@ class GameWindow:
     def __init__(self, master):
         self.master = master
         self.master.title("Ghostbuster Game")
-        self.game = Game()  # Initialize backend game logic
+
+        # Store grid size here so we can reference self.GRID_SIZE below
+        self.GRID_SIZE = GRID_SIZE
+
+        # Initialize backend game logic
+        self.game = Game()
+
         # 2D list to store button references corresponding to grid cells
-        self.buttons = [[None for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+        self.buttons = [[None for _ in range(self.GRID_SIZE)] for _ in range(self.GRID_SIZE)]
+
+        # Set up the UI (build grid, control panel, etc.)
         self.setup_ui()
+
+        # Immediately update the UI so we see initial probabilities
+        self.update_ui()
 
     def setup_ui(self):
         # Frame for the game grid
         self.grid_frame = tk.Frame(self.master)
         self.grid_frame.pack(padx=10, pady=10)
 
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE):
+        for i in range(self.GRID_SIZE):
+            for j in range(self.GRID_SIZE):
                 btn = tk.Button(
                     self.grid_frame,
                     text="",
@@ -65,14 +76,13 @@ class GameWindow:
         )
         self.status_label.pack(pady=5)
 
-        self.update_ui()
-
     def cell_clicked(self, row, col):
         """
         Handles a click on a grid cell.
         In inquiry mode, processes the inquiry; in burst mode, attempts to catch the ghost.
         """
         if self.game.burst_mode:
+            # Burst mode: one attempt to catch the ghost
             caught = self.game.burst_mode_attempt(row, col)
             self.update_ui()
             if caught:
@@ -81,6 +91,7 @@ class GameWindow:
                 messagebox.showerror("Result", "Burst mode failed. You lost!")
             self.disable_grid()
         else:
+            # Inquiry mode
             ghost_moved = self.game.inquire_cell(row, col)
             self.update_ui()
             if ghost_moved:
@@ -99,26 +110,25 @@ class GameWindow:
 
     def disable_grid(self):
         """Disables all cell buttons after a burst mode attempt."""
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE):
+        for i in range(self.GRID_SIZE):
+            for j in range(self.GRID_SIZE):
                 self.buttons[i][j].config(state=tk.DISABLED)
 
     def update_ui(self):
         """
-        Retrieves the current game state and updates each cell's appearance:
-          - Button background color reflects the cell's state (red/orange/green/neutral).
-          - If a cell is inquired, its probability is displayed.
+        Fetch the game status and update the grid.
+        We ALWAYS display the probability for each cell, even if it's not inquired.
         """
         game_status = self.game.game_status()
-        grid_state = game_status["grid"]
+        grid_state = game_status["grid"]  # A 2D list of cell info dicts
 
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE):
+        for i in range(self.GRID_SIZE):
+            for j in range(self.GRID_SIZE):
                 cell_info = grid_state[i][j]
-                color = cell_info["color"]
-                prob = cell_info["probability"]
-                inquired = cell_info["inquired"]
+                color = cell_info["color"]          # "red", "orange", "green", or "neutral"
+                prob = cell_info["probability"]     # e.g. 0.00 to 1.00
 
+                # Map logical color to button background color
                 if color == "red":
                     bg_color = "red"
                 elif color == "orange":
@@ -126,10 +136,13 @@ class GameWindow:
                 elif color == "green":
                     bg_color = "green"
                 else:
-                    bg_color = "SystemButtonFace"  # default system color
+                    bg_color = "SystemButtonFace"  # default button color
 
-                self.buttons[i][j].config(bg=bg_color)
-                self.buttons[i][j].config(text=f"{prob:.2f}" if inquired else "")
+                # Always display the probability (2 decimals)
+                text_value = f"{prob:.2f}"
+
+                # Update the button
+                self.buttons[i][j].config(bg=bg_color, text=text_value)
 
     def restart_game(self):
         """
@@ -137,8 +150,14 @@ class GameWindow:
         and updating the UI accordingly.
         """
         self.game = Game()
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE):
+        for i in range(self.GRID_SIZE):
+            for j in range(self.GRID_SIZE):
                 self.buttons[i][j].config(state=tk.NORMAL)
         self.status_label.config(text="Inquiry Mode | Ghost moves left: " + str(self.game.ghost.moves_left))
         self.update_ui()
+
+# For testing independently:
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = GameWindow(root)
+    root.mainloop()
