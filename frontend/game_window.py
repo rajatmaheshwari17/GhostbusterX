@@ -117,7 +117,7 @@ class GameWindow:
     def update_ui(self):
         """
         Fetch the game status and update the grid.
-        We ALWAYS display the probability for each cell, even if it's not inquired.
+        Now we color the BUTTON'S BORDER instead of its entire background.
         """
         game_status = self.game.game_status()
         grid_state = game_status["grid"]  # A 2D list of cell info dicts
@@ -128,21 +128,32 @@ class GameWindow:
                 color = cell_info["color"]          # "red", "orange", "green", or "neutral"
                 prob = cell_info["probability"]     # e.g. 0.00 to 1.00
 
-                # Map logical color to button background color
+                # Decide the border color based on the cell's color
                 if color == "red":
-                    bg_color = "red"
+                    border_color = "red"
                 elif color == "orange":
-                    bg_color = "orange"
+                    border_color = "orange"
                 elif color == "green":
-                    bg_color = "green"
+                    border_color = "green"
                 else:
-                    bg_color = "SystemButtonFace"  # default button color
+                    # If 'neutral', let's just use a default border color (e.g. gray or black).
+                    border_color = "black"
 
                 # Always display the probability (2 decimals)
                 text_value = f"{prob:.2f}"
 
-                # Update the button
-                self.buttons[i][j].config(bg=bg_color, text=text_value)
+                # Configure the button:
+                #  - relief="solid" + borderwidth=2 ensures a visible border
+                #  - highlightthickness=2 + highlightbackground sets the border color
+                self.buttons[i][j].config(
+                    text=text_value,
+                    relief="solid",
+                    borderwidth=2,
+                    highlightthickness=2,
+                    highlightbackground=border_color,
+                    highlightcolor=border_color,
+                    bg="SystemButtonFace"  # keep the background "normal"
+                )
 
     def restart_game(self):
         """
