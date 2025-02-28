@@ -663,7 +663,7 @@ class Grid:
         return results
 
 class Ghost:
-    def __init__(self, grid_size=GRID_SIZE, moves_left=3):
+    def __init__(self, grid_size=GRID_SIZE, moves_left=25):
         self.x = random.randint(0, grid_size - 1)
         self.y = random.randint(0, grid_size - 1)
         self.moves_left = moves_left
@@ -713,7 +713,8 @@ class Game:
     def is_ghost_nearby(self, row, col):
         gx, gy = self.ghost.position()
         return abs(gx - row) <= NEARBY_DISTANCE and abs(gy - col) <= NEARBY_DISTANCE
-
+    
+    '''
     def inquire_cell(self, row, col):
         """
         1. Mark the cell "red"/"orange"/"green".
@@ -745,6 +746,39 @@ class Game:
         self.apply_region_based_probabilities()
 
         # Step 4: Attempt ghost move. If it moves, re-apply region-based logic
+        ghost_moved = self.attempt_ghost_move(row, col)
+        return ghost_moved
+        '''
+    
+    def inquire_cell(self, row, col):
+        cell = self.grid.get_cell(row, col)
+        if not cell or cell.inquired:
+            return False
+
+        # 1) If the cell's probability is 0.0, just color it green and return.
+        if cell.probability == 0.0:
+            print("[Game] This cell has 0.0 probability; marking green and ignoring inquiry.")
+            cell.inquired = True      # Mark as inquired so it won't be clicked again
+            cell.color = "green"      # or "gray", or some other color
+            return False
+
+        # Otherwise, proceed with normal logic
+        cell.inquired = True
+        gx, gy = self.ghost.position()
+
+        if (row, col) == (gx, gy):
+            cell.color = "red"
+            print("[Game] Ghost found here!")
+        elif self.is_ghost_nearby(row, col):
+            cell.color = "orange"
+            print("[Game] Ghost is nearby!")
+        else:
+            cell.color = "green"
+            print("[Game] Ghost is far.")
+
+        # Apply constraints, recalc probabilities, attempt ghost move
+        self.apply_constraints(row, col, cell.color)
+        self.apply_region_based_probabilities()
         ghost_moved = self.attempt_ghost_move(row, col)
         return ghost_moved
 
