@@ -12,7 +12,7 @@ import tkinter as tk
 from tkinter import messagebox
 from backend.game_logic import Game
 
-GRID_SIZE = 10  # 10x10 grid
+GRID_SIZE = 8  # 10x10 grid
 
 class GameGUI:
     def __init__(self, root):
