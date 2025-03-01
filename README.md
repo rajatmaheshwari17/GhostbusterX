@@ -110,5 +110,5 @@ Each cell shows the probability \( P(\text{Color} \mid \text{Distance}) \). Noti
 -   **Min Probability Floor**: In `bayes_updates.py`, set `min_prob` to control how close to zero probabilities can get.
 -   **Ghost Moves**: Increase `moves_left` for the ghost if you want a more dynamic game.
 
-----------
+#
 _This README is a part of the GhostbusterX Project by Rajat Maheshwari._
